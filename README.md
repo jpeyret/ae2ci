@@ -136,7 +136,7 @@ UPDATE PS_TCI_SOURCE
 - Exceptions should not result in Application Engine abends but still allow updating of notification/feedback fields, even in case of a Rollback.  This is the case even in pretty extreme conditions such as divide by zero, referencing missing fields and compilation errors on imported Peoplecode.
 
 
-Most of the actual work is done by the framework so a minimal implementation may run on the order 40-50 lines of code in 3 Application Engine steps and another 40-50 in the subclass.
+Most of the actual work is done by the framework so a minimal implementation should about 40-50 lines of code in 3 Application Engine steps and another 40-50 in the subclass.
 
 See [examples](examples) for more details...
 
