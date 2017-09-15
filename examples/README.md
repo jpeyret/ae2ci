@@ -78,3 +78,9 @@ UPDATE PS_TCI_SOURCE
 **Remember:** up to now, the status code and notification are only in the AET communication record.  This step writes them to the database, **after** any commit/rollbacks.
 ***
 
+### Sample unit testing screen for this batch.
+
+No, it's not going to win any cosmetic prizes.  But take a a look at the **Status** and **Results** columns - these are error straight from the CI or even peoplecode errors.
+
+![alt text](https://github.com/jpeyret/ae2ci/blob/master/media/user_screen.png "user_screen")
+
