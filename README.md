@@ -52,9 +52,54 @@ end-method;
 
 ````
 
-####Sample Application Engine peoplecode:
+Sample Application Engine peoplecode:
 
+````
+/* assume this AE step is called by a loop and TCI_AET.EMPLID holds the key for the data to load */
 
+import TCI:*;
+
+/* we're wrapping 2 Component Interfaces in a transaction */
+Component TCI:Wrap_CI_JOB_DATA &ci_job;
+Component TCI:Wrap_CI_PERSONAL_DATA &ci_personal;
+
+Local boolean &saved = False;
+
+/* this is the state record we use to save status/error messages on 
+   It needs to be an AE State record and needs a status field and a message field.
+*/
+Local Record &rec_comm = GetRecord(Record.AE2CIAET);
+
+If (&ci_job = Null) Then
+   &ci_job = create TCI:Wrap_CI_JOB_DATA();
+End-If;
+
+If (&ci_personal = Null) Then
+   &ci_personal = create TCI:Wrap_CI_PERSONAL_DATA();
+End-If;
+
+Local Rowset &rs_data = CreateRowset(Record.TCI_SOURCE);
+&rs_data.Fill("WHERE EMPLID = :1", TCI_AET.EMPLID);
+Local Record &rec_data = &rs_data.GetRow(1).GetRecord(Record.TCI_SOURCE);
+
+/* first CI update */
+try
+   &saved = &ci_job.callci(&rec_comm, &rec_data);
+catch Exception &e_any_job
+   /* strictly speaking we don't need a rollback, yet, since is the first CI */
+   SQLExec("ROLLBACK");
+   Exit (0);
+end-try;
+
+/* second CI update, in a transaction */
+try
+   &saved = &ci_personal.callci(&rec_comm, &rec_data);
+catch Exception &e_ci_personal
+   SQLExec("ROLLBACK");
+   Exit (0);
+end-try;
+
+````
 
 
 
@@ -65,10 +110,7 @@ end-method;
 - tests the Component Interface session for error conditions.
 - manages exceptions in such a way that they should not result in Application Engine abends but still allow updating of notification/feedback fields, even in case of a rollback
 
-##You are responsible for:
 
-- subclassing the base class and wring your business logic and data-to-CI mapping.  A method is provided for that, `ci_business_logic`.
-- client Application Engine peoplecode to interact with the class.
 
 Most of the actual work is done by the framework so a minimal implementation may run on the order 40-50 lines of code in 3 Application Engine steps and another 40-50 in the subclass.
 
