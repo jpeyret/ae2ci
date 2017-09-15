@@ -2,6 +2,8 @@
 
 This repository contains an extensible Application Class that takes Rowset-based data, typically from an Application Engine and writes it to a PeopleSoft database using Component Interface.
 
+Having an AE call separate peoplecode with a rowset is the best way to avoid the AE abend errors that can happen when Component Interfaces encounter invalid data.
+
 ## How it works:
 
 #### Declaring your custom subclass
