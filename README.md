@@ -2,9 +2,9 @@
 
 This repository contains an extensible Application Class that takes Rowset-based data, typically from an Application Engine and writes it to a PeopleSoft database using Component Interface.
 
-##How it works:
+## How it works:
 
-####Declaring your custom subclass
+#### Declaring your custom subclass
 
 ````
 import AE2CI:*;</span>
@@ -20,7 +20,7 @@ method Wrap_CI_PERSONAL_DATA
 end-method;
 ````
 
-####Component Business logic goes into method *ci\_business\_logic*:
+#### Component Business logic goes into method *ci\_business\_logic*:
 
 Here's a minimal implementation that only updates 1 field:
 
@@ -48,11 +48,9 @@ method ci_business_logic
    Return &needs_saving;
 
 end-method;
-
-
 ````
 
-Sample Application Engine peoplecode:
+#### Sample Application Engine peoplecode:
 
 ````
 /* assume this AE step is called by a loop and TCI_AET.EMPLID holds the key for the data to load */
@@ -104,27 +102,26 @@ end-try;
 
 
 
-##The AE2CI framework handles:
+## The AE2CI framework handles:
 
 - calls the Component Interface
 - tests the Component Interface session for error conditions.
 - manages exceptions in such a way that they should not result in Application Engine abends but still allow updating of notification/feedback fields, even in case of a rollback
 
 
-
 Most of the actual work is done by the framework so a minimal implementation may run on the order 40-50 lines of code in 3 Application Engine steps and another 40-50 in the subclass.
 
-Sample code is provided.
+See examples for more details...
 
 
-##Installation
+## Installation
 
 This framework has been tested on PeopleTools 8.51 and 8.54 and with tools 8.5x in general.  In order to avoid PeopleTools version dependencies, the installation process is manual in nature.
 
-###Copy and paste these 5 files:
+### Copy and paste these 5 files:
 
 
-###Into an Application Package with the following structure:
+### Into an Application Package with the following structure:
 
 ![alt text](file:///Users/jluc/kds2/mygithub/ae2ci/ae2ci/media/ApplicationPackage.AE2CI.png "Application Package structure")
 
