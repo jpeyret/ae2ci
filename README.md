@@ -20,6 +20,11 @@ method Wrap_CI_PERSONAL_DATA
 end-method;
 ````
 
+***
+**Note:**  method **callci** needs to be in your subclass but can be copied from base's implementation.
+***
+
+
 #### Component Business logic goes into method *ci\_business\_logic*:
 
 Here's a minimal implementation that only updates 1 field:
@@ -52,8 +57,15 @@ end-method;
 
 #### Sample Application Engine peoplecode:
 
+***
+**note:**  Note the AE's Step attributes below:
+***
+
+`On Error: Ignore`  
+
+
 ````
-/* assume this AE step is called by a loop and TCI_AET.EMPLID holds the key for the data to load */
+/* assume this AE step is called by a loop and TCI_AET.EMPLID holds the lookup value for the data to load */
 
 import TCI:*;
 
@@ -99,14 +111,30 @@ end-try;
 
 ````
 
+#### Cleanup: your AE updates the status/user message fields in a separate step:
+
+`Commit:  After Step`  
+
+
+````sql
+UPDATE PS_TCI_SOURCE 
+  
+  SET
+  /* user visible message */ 
+  MESSAGE_TEXT_254 = %Bind(AE2CIAET.MESSAGE_TEXT_254)
+  /* status field, used to control the loop logic */
+  , SET_NOTIFY_FLAG = %Bind(AE2CIAET.SET_NOTIFY_FLAG) 
+ WHERE EMPLID = %Bind(EMPLID)
+
+````
 
 
 
 ## The AE2CI framework handles:
 
-- calls the Component Interface
-- tests the Component Interface session for error conditions.
-- manages exceptions in such a way that they should not result in Application Engine abends but still allow updating of notification/feedback fields, even in case of a rollback
+- calling the Component Interface
+- checking the Component Interface session for error conditions.
+- Exceptions should not result in Application Engine abends but still allow updating of notification/feedback fields, even in case of a Rollback.  This is the case even in pretty extreme conditions such as divide by zero, referencing missing fields and compilation errors on imported Peoplecode.
 
 
 Most of the actual work is done by the framework so a minimal implementation may run on the order 40-50 lines of code in 3 Application Engine steps and another 40-50 in the subclass.
@@ -123,6 +151,6 @@ This framework has been tested on PeopleTools 8.51 and 8.54 and with tools 8.5x 
 
 ### Into an Application Package with the following structure:
 
-![alt text](file:///Users/jluc/kds2/mygithub/ae2ci/ae2ci/media/ApplicationPackage.AE2CI.png "Application Package structure")
+![alt text](https://github.com/jpeyret/ae2ci/blob/master/media/ApplicationPackage.AE2CI.png "Application Package structure")
 
 
