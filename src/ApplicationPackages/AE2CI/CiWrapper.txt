@@ -1,0 +1,354 @@
+/*
+
+The core wrapper class.  You need to extend it in a subclass and:
+
+1. specify the name of the ComponentInterface being used in the call to the constructor
+2. implement typical PeopleSoft Component Interface business logic in method ci_business_logic.
+
+Method ci_business_logic takes 2 parameters:
+
+- &rec_comm - an in-memory AET record with a field identified in property fld_notify to hold user message data and a 1 character field to indicate
+the success/error of the CI processing.
+
+- &rec_data, the Record holding the data intended for the CI.  Rowsets are not supported, yet, but it wouldn't be difficult.
+
+The Application Engine, or other PeopleSoft peoplecode, needs to call method callci which manages the CI and calls ci_business_logic
+
+*/
+
+
+import AE2CI:*;
+
+
+class CiWrapper
+   /* typical properties you may want to change */
+   property boolean verbose;
+   property boolean InteractiveMode;
+   property boolean GetHistoryItems;
+   property boolean new_ci_each_time;
+   property string msg_fieldname;
+   property string notify_fieldname;
+
+   /*
+      I - initiated processing
+      F - fail/exception - unexpected error condition
+      Y - loaded - CI accepted the data
+      N - not loaded, rejected for business/data/CI reasons. */
+
+   property string notify_initiated; /* default I */
+   property string notify_exception; /* default F */
+   property string notify_data_error; /* default N */
+   property string notify_data_loaded; /* default Y */
+
+   method CiWrapper(&bcname_in As string);
+
+   /* these 2 methods need to be implmemented in the subclasses */
+   method check_business_logic_ok(&rec_comm As Record) Returns boolean;
+   method callci(&rec_comm As Record, &rec_data As Record) Returns boolean;
+
+   property Field fld_notify; /* default : SET_NOTIFY_FLAG */
+   property Field fld_message; /* default : MESSAGE_TEXT_254 */
+   method log(&o As any);
+
+protected
+
+   /* leave these alone unless you have a good reason to change them */
+   property string bcname readonly;
+   property Record comm;
+   property ApiObject myCI;
+
+   method check_technicals_ok(&rec_comm As Record) Returns boolean;
+   method errorHandler(&ciSession As ApiObject) Returns string;
+   method initialize_call(&rec_comm As Record) Returns boolean;
+   method save_if_needed(&rec_comm As Record, &needs_saving As boolean) Returns boolean;
+
+private
+   method ci_business_logic(&rec_comm As Record, &data As Record) Returns boolean;
+
+end-class;
+
+/* constructor */
+method CiWrapper
+   /+ &bcname_in as String +/
+
+   &bcname = &bcname_in;
+
+   /* default values, can be changed your subclass's constructor*/
+   &verbose = False;
+   &InteractiveMode = False;
+   &GetHistoryItems = False;
+   &msg_fieldname = "MESSAGE_TEXT_254";
+   &new_ci_each_time = True;
+   &notify_fieldname = "SET_NOTIFY_FLAG";
+
+   /* notification flags - change those to codes your batch understands*/
+   &notify_initiated = "I";
+   &notify_exception = "F";
+   &notify_data_error = "N";
+   &notify_data_loaded = "Y";
+
+end-method;
+
+
+
+method initialize_call
+   /+ &rec_comm as Record +/
+   /+ Returns Boolean +/
+
+   Local boolean &success;
+   Local string &msg;
+
+   /* grab the record and initialize the CI as needed */
+   &comm = &rec_comm;
+   &fld_notify = Null;
+   &fld_message = Null;
+   try
+      &fld_notify = &rec_comm.GetField(@("Field." | &notify_fieldname));
+   catch Exception &e_notify
+      &msg = "AE2CI.CiWrapper.initialize_call:error:invalid configuration:exception:did not find notification field " | &rec_comm.Name | "." | &notify_fieldname;
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+
+   try
+      &fld_message = &rec_comm.GetField(@("Field." | &msg_fieldname));
+   catch Exception &e_msg
+      &fld_notify.Value = &notify_exception;
+      &msg = "AE2CI.CiWrapper.initialize_call:error:invalid configuration:exception:did not find message field " | &rec_comm.Name | "." | &msg_fieldname;
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+
+
+   &fld_message.Value = "";
+   &fld_notify.Value = &notify_initiated;
+
+
+   %Session.PSMessagesMode = 1;
+   %Session.PSMessages.deleteAll();
+
+   If (&myCI = Null) Or
+         (%This.new_ci_each_time) Then
+      %This.log("creating CI");
+      Local string &s_ciindiretion = "CompIntfc." | %This.bcname;
+      &myCI = %Session.GetCompIntfc(@(&s_ciindiretion));
+   Else
+      /* reset the CI before use */
+      %This.log("reset CI via myCI.cancel()");
+      &myCI.cancel();
+   End-If;
+
+   If (&myCI = Null) Then
+      &msg = "AE2CI.CiWrapper._initialize:error:GetCompIntfc returned null with:@(" | &s_ciindiretion | ")";
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   End-If;
+
+   &success = %This.check_technicals_ok(&rec_comm);
+
+   &myCI.InteractiveMode = &InteractiveMode;
+   &myCI.GetHistoryItems = &GetHistoryItems;
+
+   Return &success;
+end-method;
+
+
+
+method callci
+   /+ &rec_comm as Record, +/
+   /+ &rec_data as Record +/
+   /+ Returns Boolean +/
+
+   /* This is the only method that your client code has to/should call */
+
+
+   /* This has to be overridden in your subclass, but you can keep code as is, except for the exception throw that follows */
+
+   /* do not copy this code to the subclass - start */
+   throw create AE2CI:TechnicalFailureException("CiWrapper.callci:error:you need to implement this on the subclass.  you can copy everything from here, except this exception throw", %This);
+   /* do not copy this code to the subclass - end */
+
+
+   try
+      Local boolean &success = %This.initialize_call(&rec_comm);
+      If &rec_data = Null Then
+         throw create AE2CI:TechnicalFailureException("CiWrapper.callci:exception:&rec_data is null", %This);
+      End-If;
+
+      Local boolean &needs_saving = %This.ci_business_logic(&rec_comm, &rec_data);
+      Return %This.save_if_needed(&rec_comm, &needs_saving);
+
+   catch AE2CI:AE2CIException &e_handled1
+      /* already caught and processed, send it on to the caller */
+      throw &e_handled1;
+   catch Exception &e_unhandled
+      Local string &msg = "CiWrapper.callci:exception:" | &e_unhandled.ToString();
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+end-method;
+
+
+method errorHandler
+   /+ &ciSession as ApiObject +/
+   /+ Returns String +/
+
+   Local ApiObject &oPSMessage;
+
+   Local number &i;
+
+   Local string &sErrMsgText, &sErrType, &fieldname, &errmsg;
+   Local string &sep = "";
+
+   Local ApiObject &oPSMessageCollection = %Session.PSMessages;
+
+   For &i = 1 To &oPSMessageCollection.Count
+
+      &oPSMessage = &oPSMessageCollection.Item(&i);
+      &sErrMsgText = "";
+
+      If &oPSMessage.MessageType = 1 Then
+         &sErrMsgText = "(Error)";
+      End-If;
+
+      If &oPSMessage.MessageType = 2 Then
+         &sErrMsgText = "(Warning)";
+      End-If;
+
+      If &oPSMessage.MessageType = 3 Then
+         &sErrMsgText = "(Info)";
+      End-If;
+
+      If All(&oPSMessage.Source) Then
+         try
+            Local array of string &array = Split(&oPSMessage.Source, ".");
+            &fieldname = &array [3];
+         catch Exception &e3;
+            &fieldname = &oPSMessage.Source
+         end-try;
+         &sErrMsgText = "[" | &fieldname | "] ";
+      End-If;
+
+      &sErrMsgText = &sErrMsgText | &oPSMessage.Text;
+      &errmsg = &errmsg | &sep | &sErrMsgText;
+      &sep = ",";
+
+   End-For;
+
+   &oPSMessageCollection.DeleteAll();
+   Return &errmsg;
+
+end-method;
+
+/* check for errors at non-business logic point in CI processing */
+method check_technicals_ok
+   /+ &rec_comm as Record +/
+   /+ Returns Boolean +/
+
+   If %Session.ErrorPending Then
+      Local string &msg = %This.errorHandler(%Session);
+      &fld_message.Value = &msg;
+      &fld_notify.Value = &notify_exception;
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   End-If;
+   Return True;
+
+end-method;
+
+/* check for CI business rules issues such as invalid values.
+
+It either returns True or throws an BusinessLogicException
+
+Note: this method is also called automatically by save_if_needed
+
+*/
+
+method check_business_logic_ok
+   /+ &rec_comm as Record +/
+   /+ Returns Boolean +/
+   If %Session.ErrorPending Then
+      Local string &msg = %This.errorHandler(%Session);
+      &fld_message.Value = &msg;
+      &fld_notify.Value = &notify_data_error;
+      throw create AE2CI:BusinessLogicException(&msg, %This);
+   End-If;
+   Return True;
+
+end-method;
+
+
+/* all of the following is strictly business-specific logic and depends on the CI,
+the data record as well as the business requirements
+*/
+method ci_business_logic
+   /+ &rec_comm as Record, +/
+   /+ &data as Record +/
+   /+ Returns Boolean +/
+
+
+   /* This method is specific to each subclass.  It needs to return a boolean True to indicate that the CI needs to be save()d.  */
+
+   throw create AE2CI:TechnicalFailureException("CiWrapper.ci_business_logic - you need to implement this on the subclass", %This);
+
+
+   /* sample minimal update-only implementation, for reference only. DO NOT USE*/
+
+   /*
+   Local boolean &needs_saving;
+   %Super.myCI.KEYPROP_EMPLID = &data.EMPLID.Value;
+
+   &needs_saving = %Super.myCI.Get();
+   If Not &need_saving Then
+      rem assign user/developer feedback to the message-holding field;
+      %Super.fld_message.Value = "no PERSONAL_DATA for EMPLID." | &data.EMPLID.Value;
+      Return False;
+   End-If;
+
+   &needs_saving = %This.check_business_logic_ok(&rec_comm);
+   If Not &needs_saving Then
+      Return False;
+   End-If;
+
+   If All(&data.BIRTHCOUNTRY.Value) Then
+      %Super.myCI.PROP_BIRTHCOUNTRY = &data.BIRTHCOUNTRY.Value;
+      &needs_saving = True;
+   End-If;
+
+   Return &needs_saving;
+   */
+
+end-method;
+
+method save_if_needed
+   /+ &rec_comm as Record, +/
+   /+ &needs_saving as Boolean +/
+   /+ Returns Boolean +/
+
+   Local boolean &ok_to_go = %This.check_business_logic_ok(&rec_comm);
+
+   Local string &msg;
+   try
+      If &needs_saving Then
+         Local boolean &success = &myCI.Save();
+         If Not &success Then
+            &msg = %This.errorHandler(%Session);
+            throw create AE2CI:BusinessLogicException(&msg, %This);
+         End-If;
+      End-If;
+
+   catch Exception &ex_save
+      /* apparently, can still get business logic errors here ... */
+      &msg = &ex_save.ToString();
+      throw create AE2CI:BusinessLogicException(&msg, %This);
+   end-try;
+
+   &fld_notify.Value = %This.notify_data_loaded;
+   Return &needs_saving;
+
+end-method;
+
+method log
+   /+ &o as Any +/
+   If (%This.verbose) Then
+      MessageBox(0, "", 0, 0, String(&o));
+   End-If;
+end-method;
+
+
+

@@ -1,0 +1,114 @@
+import AE2CI:*;
+
+class Wrap_CI_JOB_DATA extends AE2CI:CiWrapper
+   method Wrap_CI_JOB_DATA();
+   method callci(&rec_comm As Record, &rec_data As Record) Returns boolean;
+   method ci_business_logic(&rec_comm As Record, &rec_data As Record) Returns boolean;
+end-class;
+
+
+method Wrap_CI_JOB_DATA
+   %Super = create AE2CI:CiWrapper(CompIntfc.CI_JOB_DATA);
+   /* You could override the notify & error fieldnames here too */
+end-method;
+
+/* The actual business logic that you will have to write. */
+method ci_business_logic
+   /+ &rec_comm as Record, +/
+   /+ &rec_data as Record +/
+   /+ Returns Boolean +/
+
+   Local boolean &needs_saving = False;
+
+   %This.log("Wrap_CI_JOB_DATA.ci_business_logic");
+   Local string &msg;
+
+   %This.myCI.KEYPROP_EMPLID = &rec_data.EMPLID.Value;
+   %This.myCI.KEYPROP_EMPL_RCD = "0";
+
+   Local boolean &success = %This.myCI.Get();
+   If Not &success Then
+      &msg = "no data for EMPLID." | &rec_data.EMPLID.Value;
+      throw create AE2CI:NoDataException(&msg, %This);
+   End-If;
+
+   &success = %This.check_business_logic_ok(&rec_comm);
+
+   Local date &effdt = &rec_data.EFFDT.Value;
+   If Not All(&effdt) Then
+      /* the specialized exceptions populate the status and error fields */
+      throw create AE2CI:BusinessLogicException("no EFFDT given for row", %This);
+   End-If;
+
+   Local string &s_effdt = String(&effdt);
+   Local integer &effseq = 0;
+   Local integer &pos_insert = %This.myCI.COLL_JOB.GetEffectiveItemNum(&s_effdt, 99);
+   Local ApiObject &existing_JOB = %This.myCI.COLL_JOB.Item(&pos_insert);
+
+   /* is there data there already for that date ? */
+   If (&existing_JOB.KEYPROP_EFFDT = &effdt) Then
+      &effseq = &existing_JOB.KEYPROP_EFFSEQ + 1;
+
+      If &rec_data.EMPLID.Value = "K0G005" Then
+         /* but let's mess that up to simulate the naive handling */
+         &effseq = 0;
+      End-If;
+   End-If;
+
+   Local ApiObject &new_JOB = %This.myCI.COLL_JOB.InsertItem(&pos_insert);
+
+   &new_JOB.KEYPROP_EFFDT = &rec_data.EFFDT.Value;
+   &new_JOB.KEYPROP_EFFSEQ = &effseq;
+
+   If All(&rec_data.OFFICER_CD.Value) Then
+      &new_JOB.PROP_OFFICER_CD = &rec_data.OFFICER_CD.Value;
+      &needs_saving = True;
+   End-If;
+
+   Local string &old_loc = &new_JOB.PROP_LOCATION;
+   If All(&rec_data.DEPTID.Value) Then
+      &new_JOB.PROP_DEPTID = &rec_data.DEPTID.Value;
+      /* NOTE:  changing DEPTID online blanks out LOCATION */
+      &new_JOB.PROP_LOCATION = &old_loc;
+      &needs_saving = True;
+   End-If;
+
+   If &rec_data.EMPLID.Value = "K0G003" Then
+      /* cause a hard Peoplecode error */
+      Local integer &foo = 1 / 0;
+      &needs_saving = True;
+   End-If;
+
+   Return &needs_saving;
+end-method;
+
+/* callci is pretty much boilerplate, but unfortunately needs to be re-implemented because
+%Super.callci would otherwise call %Super.ci_business_logic
+*/
+method callci
+   /+ &rec_comm as Record, +/
+   /+ &rec_data as Record +/
+   /+ Returns Boolean +/
+   /+ Extends/implements AE2CI:CiWrapper.callci +/
+
+   try
+      Local boolean &success = %This.initialize_call(&rec_comm);
+      If &rec_data = Null Then
+         throw create AE2CI:TechnicalFailureException("Wrap_CI_JOB_DATA.callci:exception:&rec_data is null", %This);
+      End-If;
+
+      Local boolean &needs_saving = %This.ci_business_logic(&rec_comm, &rec_data);
+      Return %This.save_if_needed(&rec_comm, &needs_saving);
+
+   catch AE2CI:AE2CIException &e_handled1
+      /* already caught and processed, send it on to the caller */
+      throw &e_handled1;
+   catch Exception &e_unhandled
+      Local string &msg = "Wrap_CI_JOB_DATA.callci:exception:" | &e_unhandled.ToString();
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+
+end-method;
+
+
+

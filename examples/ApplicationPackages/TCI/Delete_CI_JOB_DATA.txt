@@ -1,0 +1,107 @@
+import TCI:*;
+import AE2CI:*;
+
+class Delete_CI_JOB_DATA extends TCI:Wrap_CI_JOB_DATA
+   method Delete_CI_JOB_DATA();
+   method callci(&rec_comm As Record, &rec_data As Record) Returns boolean;
+   method ci_business_logic(&recaet As Record, &data As Record) Returns boolean;
+end-class;
+
+
+method Delete_CI_JOB_DATA
+   %Super = create TCI:Wrap_CI_JOB_DATA();
+   %This.verbose = True;
+end-method;
+
+/* the actual business logic */
+method ci_business_logic
+   /+ &recaet as Record, +/
+   /+ &data as Record +/
+   /+ Returns Boolean +/
+   /+ Extends/implements TCI:Wrap_CI_JOB_DATA.ci_business_logic +/
+
+   %This.log("Delete_CI_JOB_DATA.ci_business_logic");
+
+   Local string &msg;
+
+   Local string &emplid = &data.EMPLID.Value;
+
+   %This.myCI.KEYPROP_EMPLID = &emplid;
+   %This.myCI.KEYPROP_EMPL_RCD = "0";
+
+   Local boolean &success = %This.myCI.Get();
+   If Not &success Then
+      rem &msg = "no data for EMPLID." | &data.EMPLID.Value;
+      Return False;
+   End-If;
+
+   /* can't delete using indices in a for loop by index, as deleting shifts the index */
+
+   Local ApiObject &collection = %This.myCI.COLL_JOB;
+   Local boolean &needs_saving = False;
+   Local ApiObject &top = &collection.item(1);
+
+   Local integer &max_pass = &collection.count;
+
+   While &top.KEYPROP_EFFDT >= &data.EFFDT.Value And
+         &max_pass > 0
+      /* this is vulnerable to an infinite loop if the delete doesnt happen
+
+   While &top.KEYPROP_EFFDT >= &data.EFFDT.Value And
+         &collection.count > 0
+
+Cannot change current or history records unless in Correction mode. (15,1)
+Failed to insert/delete. {CI_JOB_DATA.COLL_JOB} (91,25)
+Cannot change current or history records unless in Correction mode. (15,1)
+Failed to insert/delete. {CI_JOB_DATA.COLL_JOB} (91,25)
+      */
+
+
+      rem &msg = "JOB[" | String(1) | "].EFFDT=" | String(&top.KEYPROP_EFFDT) | ".delete";
+      rem %This.log(&msg);
+
+      /* keep K0G005/date/0 around for data conflict testing */
+      If Not (&emplid = "K0G005" And
+            &top.KEYPROP_EFFDT = &data.EFFDT.Value And
+            &top.KEYPROP_EFFSEQ = 0) Then
+         &collection.deleteItem(1);
+         &needs_saving = True;
+      End-If;
+
+      &success = %This.check_business_logic_ok(&recaet);
+      &max_pass = &max_pass - 1;
+      &top = &collection.Item(1);
+   End-While;
+
+   Return &needs_saving;
+end-method;
+
+method callci
+   /+ &rec_comm as Record, +/
+   /+ &rec_data as Record +/
+   /+ Returns Boolean +/
+   /+ Extends/implements TCI:Wrap_CI_JOB_DATA.callci +/
+
+   try
+
+      Local boolean &success = %This.initialize_call(&rec_comm);
+      If &rec_data = Null Then
+         throw create AE2CI:TechnicalFailureException("Delete_CI_JOB_DATA.callci:exception:&rec_data is null", %This);
+      End-If;
+
+      Local boolean &needs_saving = %This.ci_business_logic(&rec_comm, &rec_data);
+      Return %This.save_if_needed(&rec_comm, &needs_saving);
+
+   catch AE2CI:AE2CIException &e_handled1
+      /* already caught and processed, send it on to the caller */
+      throw &e_handled1;
+   catch Exception &e_unhandled
+      Local string &msg = "Delete_CI_JOB_DATA.callci:exception:" | &e_unhandled.ToString();
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+
+
+end-method;
+
+
+

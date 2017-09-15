@@ -1,0 +1,99 @@
+import AE2CI:*;
+
+class Wrap_CI_PERSONAL_DATA extends AE2CI:CiWrapper
+   method Wrap_CI_PERSONAL_DATA();
+   method callci(&rec_comm As Record, &rec_data As Record) Returns boolean;
+   method ci_business_logic(&rec_comm As Record, &data As Record) Returns boolean;
+end-class;
+
+
+method Wrap_CI_PERSONAL_DATA
+   %Super = create AE2CI:CiWrapper(CompIntfc.CI_PERSONAL_DATA);
+end-method;
+
+method ci_business_logic
+   /+ &rec_comm as Record, +/
+   /+ &data as Record +/
+   /+ Returns Boolean +/
+
+   %This.log("Wrap_CI_PERSONAL_DATA.ci_business_logic");
+   Local boolean &needs_save = False;
+
+
+   Local boolean &success;
+   %Super.myCI.KEYPROP_EMPLID = &data.EMPLID.Value;
+
+   &success = %Super.myCI.Get();
+   If Not &success Then
+      %Super.fld_message.Value = "no PERSONAL_DATA for EMPLID." | &data.EMPLID.Value;
+      Return False;
+   End-If;
+
+   &success = %This.check_business_logic_ok(&rec_comm);
+   If Not &success Then
+      Return False;
+   End-If;
+
+   Local date &effdt = &data.EFFDT.Value;
+
+   If Not All(&effdt) Then
+      %Super.fld_message.Value = "no EFFDT given for row";
+      Return False;
+   End-If;
+
+   Local string &s_effdt = String(&effdt);
+
+   Local ApiObject &collection = %Super.myCI.COLL_PERS_DATA_EFFDT;
+
+   Local ApiObject &row_tgt;
+
+   Local integer &pos_insert = &collection.GetEffectiveItemNum(&s_effdt, 0);
+
+   Local ApiObject &row_current = &collection.Item(&pos_insert);
+
+   &row_current = &collection.Item(&pos_insert);
+   If (&row_current.KEYPROP_EFFDT = &data.EFFDT.Value) Then
+      /*update */
+      &row_tgt = &row_current;
+   Else
+      &row_tgt = &collection.InsertItem(&pos_insert);
+      &row_tgt.KEYPROP_EFFDT = &data.EFFDT.Value;
+   End-If;
+
+   If All(&data.MAR_STATUS.Value) Then
+      &row_tgt.PROP_MAR_STATUS = &data.MAR_STATUS.Value;
+      &needs_save = True;
+   End-If;
+
+   Return &needs_save;
+end-method;
+
+/* boilerplate, same on each subclass */
+method callci
+   /+ &rec_comm as Record, +/
+   /+ &rec_data as Record +/
+   /+ Returns Boolean +/
+   /+ Extends/implements AE2CI:CiWrapper.callci +/
+
+   try
+
+      Local boolean &success = %This.initialize_call(&rec_comm);
+      If &rec_data = Null Then
+         throw create AE2CI:TechnicalFailureException("callci:exception:&rec_data is null", %This);
+      End-If;
+
+      Local boolean &needs_saving = %This.ci_business_logic(&rec_comm, &rec_data);
+      Return %This.save_if_needed(&rec_comm, &needs_saving);
+
+   catch AE2CI:AE2CIException &e_handled1
+      /* already caught and processed, send it on to the caller */
+      throw &e_handled1;
+   catch Exception &e_unhandled
+      Local string &msg = "callci:exception:" | &e_unhandled.ToString();
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+
+end-method;
+
+
+

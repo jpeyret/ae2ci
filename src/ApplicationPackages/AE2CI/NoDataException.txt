@@ -1,0 +1,15 @@
+import AE2CI:*;
+
+class NoDataException extends AE2CI:BusinessLogicException
+   method NoDataException(&msg As string, &wrapper As AE2CI:CiWrapper);
+end-class;
+
+
+method NoDataException
+   /+ &msg as String, +/
+   /+ &wrapper as AE2CI:CiWrapper +/
+   %Super = create AE2CI:BusinessLogicException(&msg, &wrapper);
+end-method;
+
+
+

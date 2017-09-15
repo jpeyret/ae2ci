@@ -1,0 +1,24 @@
+class AE2CIException extends Exception
+   /* base class indicates that its been set by the CI wrapper */
+   method AE2CIException(&msg As string, &fld_message As Field, &fld_notify As Field, &notify_flag As string);
+end-class;
+
+
+method AE2CIException
+   /+ &msg as String, +/
+   /+ &fld_message as Field, +/
+   /+ &fld_notify as Field, +/
+   /+ &notify_flag as String +/
+   %Super = CreateException(0, 0, &msg);
+   try
+      &fld_notify.Value = &notify_flag;
+   catch Exception &e_ignore
+
+   end-try;
+   If All(&fld_message) Then
+      &fld_message.Value = &msg;
+   End-If;
+end-method;
+
+
+

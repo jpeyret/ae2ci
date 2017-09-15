@@ -118,7 +118,6 @@ end-try;
 
 ````sql
 UPDATE PS_TCI_SOURCE 
-  
   SET
   /* user visible message */ 
   MESSAGE_TEXT_254 = %Bind(AE2CIAET.MESSAGE_TEXT_254)
@@ -139,18 +138,27 @@ UPDATE PS_TCI_SOURCE
 
 Most of the actual work is done by the framework so a minimal implementation may run on the order 40-50 lines of code in 3 Application Engine steps and another 40-50 in the subclass.
 
-See examples for more details...
+See [examples](examples) for more details...
 
 
 ## Installation
 
-This framework has been tested on PeopleTools 8.51 and 8.54 and with tools 8.5x in general.  In order to avoid PeopleTools version dependencies, the installation process is manual in nature.
+This code has been tested on PeopleTools 8.51 and 8.54 and supports tools 8.5x in general.  In order to avoid PeopleTools version dependencies, the "installation process" is copy and paste :-( .
 
 ### Copy and paste these 5 files:
+
+````
+└── src
+    └── ApplicationPackages
+        └── AE2CI
+            ├── AE2CIException.txt
+            ├── BusinessLogicException.txt
+            ├── CiWrapper.txt
+            ├── NoDataException.txt
+            └── TechnicalFailureException.txt
+````
 
 
 ### Into an Application Package with the following structure:
 
 ![alt text](https://github.com/jpeyret/ae2ci/blob/master/media/ApplicationPackage.AE2CI.png "Application Package structure")
-
-

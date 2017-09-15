@@ -1,0 +1,84 @@
+import AE2CI:*;
+import TCI:*;
+
+class Delete_CI_PERSONAL_DATA extends TCI:Wrap_CI_PERSONAL_DATA
+   method Delete_CI_PERSONAL_DATA();
+   method callci(&rec_comm As Record, &rec_data As Record) Returns boolean;
+   method ci_business_logic(&rec_comm As Record, &data As Record) Returns boolean;
+end-class;
+
+
+method Delete_CI_PERSONAL_DATA
+   %Super = create TCI:Wrap_CI_PERSONAL_DATA();
+   %This.verbose = True;
+end-method;
+
+method ci_business_logic
+   /+ &rec_comm as Record, +/
+   /+ &data as Record +/
+   /+ Returns Boolean +/
+   /+ Extends/implements TCI:Wrap_CI_PERSONAL_DATA.ci_business_logic +/
+
+   %This.log("Delete_CI_PERSONAL_DATA.ci_business_logic");
+   Local string &msg;
+   Local boolean &success;
+
+   %Super.myCI.KEYPROP_EMPLID = &data.EMPLID.Value;
+
+   &success = %Super.myCI.Get();
+   If Not &success Then
+      %Super.fld_message.Value = "no PERSONAL_DATA for EMPLID." | &data.EMPLID.Value;
+      Return False;
+   End-If;
+
+   Local ApiObject &collection = %This.myCI.COLL_PERS_DATA_EFFDT;
+
+   Local ApiObject &top = &collection.item(1);
+   Local boolean &needs_saving = False;
+   Local integer &max_pass = &collection.count;
+
+   While &top.KEYPROP_EFFDT >= &data.EFFDT.Value And
+         &max_pass > 0
+
+      rem &msg = "PERS_DATA_EFFDT[" | String(1) | "].EFFDT=" | String(&top.KEYPROP_EFFDT) | ".delete";
+      rem %This.log(&msg);
+      &collection.deleteItem(1);
+      &success = %This.check_business_logic_ok(&rec_comm);
+      &needs_saving = True;
+      &max_pass = &max_pass - 1;
+      &top = &collection.Item(1);
+   End-While;
+
+
+   Return &needs_saving;
+end-method;
+
+/* boilerplate, same on each subclass */
+method callci
+   /+ &rec_comm as Record, +/
+   /+ &rec_data as Record +/
+   /+ Returns Boolean +/
+   /+ Extends/implements TCI:Wrap_CI_PERSONAL_DATA.callci +/
+
+   try
+
+      Local boolean &success = %This.initialize_call(&rec_comm);
+      If &rec_data = Null Then
+         throw create AE2CI:TechnicalFailureException("callci:exception:&rec_data is null", %This);
+      End-If;
+
+      Local boolean &needs_saving = %This.ci_business_logic(&rec_comm, &rec_data);
+      Return %This.save_if_needed(&rec_comm, &needs_saving);
+
+   catch AE2CI:AE2CIException &e_handled1
+      /* already caught and processed, send it on to the caller */
+      throw &e_handled1;
+   catch Exception &e_unhandled
+      Local string &msg = "callci:exception:" | &e_unhandled.ToString();
+      throw create AE2CI:TechnicalFailureException(&msg, %This);
+   end-try;
+
+end-method;
+
+
+

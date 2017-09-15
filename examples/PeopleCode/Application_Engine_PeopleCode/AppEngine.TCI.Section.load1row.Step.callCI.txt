@@ -1,0 +1,72 @@
+import TCI:*;
+import AE2CI:*;
+
+
+Function log(&o As any)
+   MessageBox(0, "", 0, 0, String(&o));
+End-Function;
+
+Component TCI:Wrap_CI_JOB_DATA &ci_job;
+Component TCI:Wrap_CI_PERSONAL_DATA &ci_personal;
+
+Local boolean &saved = False;
+
+/* this is the state record we use to save status/error messages on */
+Local Record &rec_comm = GetRecord(Record.AE2CIAET);
+
+If (&ci_job = Null) Then
+   &ci_job = create TCI:Wrap_CI_JOB_DATA();
+End-If;
+
+If (&ci_personal = Null) Then
+   &ci_personal = create TCI:Wrap_CI_PERSONAL_DATA();
+
+   /* redundant, because these are the default values anyway */
+   &ci_personal.msg_fieldname = "MESSAGE_TEXT_254";
+   &ci_personal.notify_fieldname = "SET_NOTIFY_FLAG";
+   &ci_personal.notify_exception = "F";
+End-If;
+
+Local Rowset &rs_data = CreateRowset(Record.TCI_SOURCE);
+&rs_data.Fill("WHERE EMPLID = :1", TCI_AET.EMPLID);
+Local Record &rec_data = &rs_data.GetRow(1).GetRecord(Record.TCI_SOURCE);
+
+If &rec_data.SET_NOTIFY_FLAG.Value = "D" Then
+   /* just for testing, we are doing deletes instead */
+   try
+      Local TCI:Delete_CI_JOB_DATA &flush_job = create TCI:Delete_CI_JOB_DATA();
+      Local TCI:Delete_CI_PERSONAL_DATA &flush_perso = create TCI:Delete_CI_PERSONAL_DATA();
+      &saved = &flush_job.callci(&rec_comm, &rec_data);
+      &saved = &flush_perso.callci(&rec_comm, &rec_data);
+      Exit (0);
+   catch Exception &e_flush
+      log("delete.exception:" | String(&e_flush));
+      SQLExec("ROLLBACK");
+      Exit (1);
+   end-try;
+End-If;
+
+try
+   &saved = &ci_job.callci(&rec_comm, &rec_data);
+catch AE2CI:NoDataException &e_missing_job
+   /* in this case we want to exit if the CI did not find a Job for that EMPLID.
+      other cases, concerning optional data, may proceed differently*/
+   log("&ci_job.exception:" | String(&e_missing_job));
+   Exit (0);
+catch Exception &e_any_job
+   log("&ci_job rollback due to exception:" | String(&e_any_job));
+   /* strictly speaking we don't need a rollback, yet, since is the first CI */
+   SQLExec("ROLLBACK");
+   Exit (0);
+end-try;
+
+try
+   &saved = &ci_personal.callci(&rec_comm, &rec_data);
+catch Exception &e_ci_personal
+   log("&ci_personal.rollback due to exception:" | &e_ci_personal.ToString());
+   /* we could elect to only rollback if something was &saved already */
+   SQLExec("ROLLBACK");
+   Exit (0);
+end-try;
+
+

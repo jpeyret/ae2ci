@@ -1,0 +1,16 @@
+import AE2CI:*;
+
+class TechnicalFailureException extends AE2CI:AE2CIException
+   /* unexpected error.  check with technical resource */
+   method TechnicalFailureException(&msg As string, &wrapper As AE2CI:CiWrapper);
+end-class;
+
+method TechnicalFailureException
+   /+ &msg as String, +/
+   /+ &wrapper as AE2CI:CiWrapper +/
+   &wrapper.log(&msg);
+   %Super = create AE2CI:AE2CIException(&msg, &wrapper.fld_message, &wrapper.fld_notify, &wrapper.notify_exception);
+end-method;
+
+
+

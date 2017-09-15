@@ -1,0 +1,17 @@
+import AE2CI:*;
+
+class BusinessLogicException extends AE2CI:AE2CIException
+   /* indicates anticipated data error rather than loader coding error */
+   method BusinessLogicException(&msg As string, &wrapper As AE2CI:CiWrapper);
+end-class;
+
+
+method BusinessLogicException
+   /+ &msg as String, +/
+   /+ &wrapper as AE2CI:CiWrapper +/
+   &wrapper.log(&msg);
+   %Super = create AE2CI:AE2CIException(&msg, &wrapper.fld_message, &wrapper.fld_notify, &wrapper.notify_data_error);
+end-method;
+
+
+
