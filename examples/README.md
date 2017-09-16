@@ -12,7 +12,7 @@ Subject| Wrapper Class Attribute | Default value
 **Notification code: Initiated**  | `notify_initiated ` | I (initiated)
 **Notification code: Exception**  | `notify_exception ` | F (fail)
 **Notification code: Data Error**  | `notify_data_error ` | N (not loaded)
-**Notification code: Loaded**  | `notify_data_loaded ` | Y (not loaded)
+**Notification code: Loaded**  | `notify_data_loaded ` | Y (data loaded)
 
 These can be modified in your subclass's constructor, after calling the **super** constructor, but you need to make sure your Application Engine and communication record match.
 
@@ -62,7 +62,7 @@ The wrapper class does not have to know about all these codes, it only needs to 
 **Warning:** watch the On Error and make sure the **updMsg** step always runs, otherwise a Do-While might run infinitely.
 ***
 
-![alt text](https://github.com/jpeyret/ae2ci/blob/master/media/loop.png "loop")
+![alt text](https://github.com/jpeyret/ae2ci/blob/master/media/load.png "load")
 
 ###### sql to update the staging record
 
